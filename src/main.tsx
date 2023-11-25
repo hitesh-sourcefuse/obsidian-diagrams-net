@@ -1,18 +1,25 @@
 import { addIcon, Notice, Plugin, TFile, Vault, Workspace, WorkspaceLeaf, MenuItem, MarkdownView, TAbstractFile, Menu, Editor } from 'obsidian';
-import { DIAGRAM_VIEW_TYPE, ICON } from './constants';
+// const { nativeTheme } = require('electron').remote;
+// import {nativeTheme } from '@electron/remote'
+import {DIAGRAM_EDIT_VIEW_TYPE, DIAGRAM_VIEW_TYPE, ICON} from './constants';
 import DiagramsView from './diagrams-view';
+import type { Settings } from './settings';
 
+import {DEFAULT_SETTINGS, DiagramsNetSettingsTab, SettingStorage} from './settings'
+import DiagramsFileView from "./diagrams-file-view";
 
 export default class DiagramsNet extends Plugin {
 
 	vault: Vault;
 	workspace: Workspace;
 	diagramsView: DiagramsView;
+	settings: Settings;
 
 	async onload() {
 
 		this.vault = this.app.vault;
 		this.workspace = this.app.workspace;
+		await this.loadSettings();
 
 		addIcon("diagram", ICON);
 
@@ -46,21 +53,25 @@ export default class DiagramsNet extends Plugin {
 			hotkeys: []
 		});
 
-
-		// this.addRibbonIcon("diagram", "Insert new diagram", () => this.attemptNewDiagram() );
-
-		this.registerEvent(
-			this.app.workspace.on("file-menu", this.handleFileMenu, this)
-		);
-
-		this.registerEvent(
-			this.app.workspace.on("editor-menu", this.handleEditorMenu, this)
-		);
-
-
+		this.registerEvent(this.app.workspace.on("file-menu", this.handleFileMenu, this));
+		this.registerEvent(this.app.workspace.on("editor-menu", this.handleEditorMenu, this));
+		// @ts-ignore
+		this.registerEvent(this.app.vault.on('config-change', this.loadSettings, this));
 		this.registerEvent(this.app.vault.on('rename', (file, oldname) => this.handleRenameFile(file, oldname)));
 		this.registerEvent(this.app.vault.on('delete', (file) => this.handleDeleteFile(file)));
 
+		this.addSettingTab(new DiagramsNetSettingsTab(this.app, this));
+		this.registerView(DIAGRAM_EDIT_VIEW_TYPE, (leaf: WorkspaceLeaf) => {
+			return this.diagramsView = new DiagramsFileView(
+				leaf, null,{
+					path: this.activeLeafPath(this.workspace),
+					basename: this.activeLeafName(this.workspace),
+					svgPath: "",
+					xmlPath: "",
+					diagramExists: false,
+				})
+		});
+		this.registerExtensions(["drawio"], DIAGRAM_EDIT_VIEW_TYPE);
 	}
 
 	isFileValidDiagram(file: TAbstractFile) {
@@ -106,7 +117,6 @@ export default class DiagramsNet extends Plugin {
 		};
 		this.initView(fileInfo);
 	}
-
 
 	attemptEditDiagram(svgFile: TFile) {
 		if (!this.isFileValidDiagram(svgFile)) {
@@ -155,7 +165,7 @@ export default class DiagramsNet extends Plugin {
 		}
 	}
 
-	handleFileMenu(menu: Menu, file: TAbstractFile) {
+	handleFileMenu(menu: Menu, file: TAbstractFile, source: string) {
 		if (file instanceof TFile && file.extension === 'svg') {
 			menu.addItem((item) => {
 				item
@@ -165,6 +175,14 @@ export default class DiagramsNet extends Plugin {
 						this.attemptEditDiagram(file);
 					});
 			});
+		}
+		if (source === "file-explorer-context-menu") {
+			menu.addItem((item) => {
+				item.setTitle(`Git: Stage`)
+					.setIcon("plus-circle")
+					.setSection("action")
+					.onClick(() => {})
+			})
 		}
 	}
 
@@ -179,9 +197,18 @@ export default class DiagramsNet extends Plugin {
 		});
 	}
 
+	async loadSettings() {
+		// @ts-ignore
+		const settings = {...await this.loadData(), systemTheme: this.vault.getConfig('theme')};
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, settings);
+		SettingStorage.populateSetting(settings);
+	}
+
+	async saveSettings() {
+		await this.saveData(this.settings);
+	}
+
 	async onunload() {
 	}
 
 }
-
-

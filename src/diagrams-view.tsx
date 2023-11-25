@@ -1,10 +1,10 @@
-import { ItemView, WorkspaceLeaf, Workspace, View, Vault, TFile } from 'obsidian';
+import { FileView, WorkspaceLeaf, Workspace, View, Vault, TFile } from 'obsidian';
 import { DIAGRAM_VIEW_TYPE } from './constants';
 import { DiagramsApp } from './DiagramsApp';
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 
-export default class DiagramsView extends ItemView {
+export default class DiagramsView extends FileView {
     filePath: string;
     fileName: string;
     svgPath: string;
@@ -36,11 +36,25 @@ export default class DiagramsView extends ItemView {
         this.hostView = hostView
     }
 
+	async saveEvent(msg: any) {
+		const svgData = msg.svgMsg.data
+		const svgBuffer = Buffer.from(svgData.replace('data:image/svg+xml;base64,', ''), 'base64')
+		if (this.diagramExists) {
+			const svgFile = this.vault.getAbstractFileByPath(this.svgPath)
+			const xmlFile = this.vault.getAbstractFileByPath(this.xmlPath)
+			if (!(svgFile instanceof TFile && xmlFile instanceof TFile)) {
+				return
+			}
+			this.vault.modifyBinary(svgFile, svgBuffer)
+			this.vault.modify(xmlFile, msg.svgMsg.xml)
+		}
+		else {
+			this.vault.createBinary(this.svgPath, svgBuffer)
+			this.vault.create(this.xmlPath, msg.svgMsg.xml)
+		}
+	}
 
-
-
-    async onOpen() {
-
+    async loadLayout() {
         const handleExit = async () => {
             close()
         }
@@ -94,7 +108,7 @@ export default class DiagramsView extends ItemView {
 
         const container = this.containerEl.children[1];
 
-        ReactDOM.render(
+		ReactDOM.render(
             <DiagramsApp
                 xmlPath={this.xmlPath}
                 diagramExists={this.diagramExists}
@@ -106,8 +120,11 @@ export default class DiagramsView extends ItemView {
         );
     }
 
+	async onOpen(){
+		return this.loadLayout()
+	}
+
     async onClose() {
         ReactDOM.unmountComponentAtNode(this.containerEl.children[1]);
     }
-
 }

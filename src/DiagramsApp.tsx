@@ -3,8 +3,6 @@ import useDiagramsNet from './useDiagramsNet';
 
 
 export const DiagramsApp = (props: any) => {
-
-
     const {
         xmlPath,
         diagramExists,
@@ -43,5 +41,4 @@ export const DiagramsApp = (props: any) => {
     }, [xmlData])
 
     return <div id="drawIoDiagramFrame" />
-
 };

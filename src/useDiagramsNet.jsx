@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom'
+import {SettingStorage} from "./settings";
 const bgColor="white"
 /**
  * - Based on: https://github.com/jgraph/drawio-integration
@@ -16,10 +17,16 @@ function useDiagramsNet(onSaveCallback, onStopEditing, getName, getData) {
 
     const blankDiagram = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIHdpZHRoPSI5MXB4IiBoZWlnaHQ9IjYxcHgiIHZpZXdCb3g9Ii0wLjUgLTAuNSA5MSA2MSIgY29udGVudD0iJmx0O214ZmlsZSBldGFnPSZxdW90O255VDJrWi1zUFJUTzlwV2c0LU9XJnF1b3Q7IGFnZW50PSZxdW90OzUuMCAoTWFjaW50b3NoKSZxdW90OyBtb2RpZmllZD0mcXVvdDsyMDIwLTA2LTAzVDE1OjEwOjA1LjM0OFomcXVvdDsgaG9zdD0mcXVvdDt3d3cuZHJhdy5pbyZxdW90OyB2ZXJzaW9uPSZxdW90OzEzLjEuMTQmcXVvdDsmZ3Q7Jmx0O2RpYWdyYW0gaWQ9JnF1b3Q7clV1eHZtYW1kTloxenJMWE9sXzYmcXVvdDsgbmFtZT0mcXVvdDtQYWdlLTEmcXVvdDsmZ3Q7bFpOTGM0SXdFTWMvRFVkbUFyR1ZIcTFhKzVqV1RwMk9NOTRpV1VNNmdUQWhLdlRURjJURFk3ellFN3UvN0NQNzMrRFJlVnF1RE11VGQ4MUJlU0hocFVjWFhoZ0dFYVgxcHlGVlM2YlJ0QVhDU0k1QlBkaklYMEJJa0I0bGgySVVhTFZXVnVaakdPc3NnOWlPR0ROR244ZGhCNjNHWFhNbTRBcHNZcWF1NlZaeW03UTB1aU05ZndZcEV0YzVJSGlTTWhlTW9FZ1kxK2NCb2t1UHpvM1d0clhTY2c2cUVjL3A4aEY4TGlZaC9mS3pIWWxGT0Z2dWhQVGJZay8vU2VsR01KRFpXMHQvRjJEVys1OUcwcEFvdHEvWGVzbGNTQ1lNUzl1U3JtMTIzRS9zeXlrbzEyL2JWM3JRZWx2Ti9IN0c3cHFGclp5dVJoOHpEazArOGVpalVLd28wTzUwYXB3YnI0NGpuc0JZS0FlTHcvWXIwQ2xZVTlVaGVFcmRWdkJaUnVpZSt4MC9JRW9HNjcxSHh2QlZpYTV3cjF4dDRNRE9IV2pwVUwvMlMvamc1NkhMUHc9PSZsdDsvZGlhZ3JhbSZndDsmbHQ7L214ZmlsZSZndDsiPjxkZWZzLz48Zz48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iOTAiIGhlaWdodD0iNjAiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iIzAwMDAwMCIgcG9pbnRlci1ldmVudHM9ImFsbCIvPjxnIGZpbGw9IiMwMDAwMDAiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtc2l6ZT0iMTJweCI+PHRleHQgeD0iNDQuNSIgeT0iMzQuNSI+RGlhZ3JhbTwvdGV4dD48L2c+PC9nPjwvc3ZnPg=="
 
-    const domain = 'https://embed.diagrams.net/'
-    const ui = '&ui=min'
-    const libraries = '&libraries=1'
-    const url = domain + '?embed=1&proto=json&spin=1' + ui + libraries
+    const domain = SettingStorage.getSetting('domain')
+    const ui = '&ui='+SettingStorage.getSetting('diagramTheme')
+    const libraries = '&libraries=1'+
+		'&browser=0'+
+		'&picker=0'+
+		'&plugins=1'+
+		'&p=sql'
+	const dark = '&dark='+SettingStorage.getSetting('colorSchema');
+
+    const url = domain + '?embed=1&proto=json&spin=1' + ui + libraries + dark
 
     const frameRef = useRef(null);
     const frameId = 'drawIoDiagramFrame'
@@ -52,6 +59,7 @@ function useDiagramsNet(onSaveCallback, onStopEditing, getName, getData) {
     }
 
     function _handleMessage(msg) {
+		console.log("Diagram event msg", msg.event, msg)
         if (msg.event === 'init') {
             callInitializeEditor();
         }
@@ -78,17 +86,12 @@ function useDiagramsNet(onSaveCallback, onStopEditing, getName, getData) {
             if (msg.message.exit) {
                 msg.event = false
             }
-            //console.log('msg', msg)
-
-            // callSave(msg)
             if (msg.format === "png") {
                 setSave1(msg)
             }
             else if (msg.format === "svg") {
                 setSave2(msg)
             }
-
-            //setSave([ ...save, msg])
         }
         if (msg.event === 'exit') {
             callStopEditing();
@@ -108,9 +111,10 @@ function useDiagramsNet(onSaveCallback, onStopEditing, getName, getData) {
 
         _postMessage({
             action: 'load',
-            noSaveBtn: 1,
+            noSaveBtn: 0,
             autosave: 0,
-            saveAndExit: '1',
+            saveAndExit: 0,
+			noExitBtn: 0,
             modified: 'unsavedChanges',
             xml: diagram,
             title: title,
@@ -134,6 +138,7 @@ function useDiagramsNet(onSaveCallback, onStopEditing, getName, getData) {
             id={frameId}
             title={frameId}
             ref={frameRef}
+			// onLoad={function(){ console.log(frameRef.current); debugger }}
             // sandbox="allow-scripts allow-same-origin"
             style={{
                 position: 'fixed',
