@@ -21,11 +21,11 @@ import {DIAGRAM_EDIT_VIEW_TYPE, DIAGRAM_VIEW_TYPE, ICON} from './constants';
 import DiagramsView from './diagrams-view';
 import type {Settings} from './settings';
 import {DEFAULT_SETTINGS, DiagramsNetSettingsTab, SettingStorage} from './settings'
-import DiagramsFileView from "./diagrams-file-view";
 import * as path from "path";
 import {blankDiagram} from "./useDiagramsNet";
 import * as ReactDOM from "react-dom";
 import * as React from 'react';
+import {getXmlPath} from "./utils/file-helper";
 
 export default class DiagramsNet extends Plugin {
 
@@ -39,22 +39,7 @@ export default class DiagramsNet extends Plugin {
         this.vault = this.app.vault;
         this.workspace = this.app.workspace;
         await this.loadSettings();
-
         addIcon("diagram", ICON);
-
-        this.registerView(
-            DIAGRAM_VIEW_TYPE,
-            (leaf: WorkspaceLeaf) => (
-                this.diagramsView = new DiagramsView(
-                    leaf, null, {
-                        path: this.activeLeafPath(this.workspace),
-                        basename: this.activeLeafName(this.workspace),
-                        svgPath: '',
-                        xmlPath: '',
-                        diagramExists: false,
-                    })
-            )
-        );
 
         this.addCommand({
             id: 'app:diagrams-net-new-diagram',
@@ -71,7 +56,6 @@ export default class DiagramsNet extends Plugin {
             },
             hotkeys: []
         });
-
         this.registerEvent(this.app.workspace.on("file-menu", this.handleFileMenu, this));
         this.registerEvent(this.app.workspace.on("editor-menu", this.handleEditorMenu, this));
         // @ts-ignore
@@ -80,8 +64,22 @@ export default class DiagramsNet extends Plugin {
         this.registerEvent(this.app.vault.on('delete', (file) => this.handleDeleteFile(file)));
 
         this.addSettingTab(new DiagramsNetSettingsTab(this.app, this));
+
+        this.registerView(
+            DIAGRAM_VIEW_TYPE,
+            (leaf: WorkspaceLeaf) => (
+                this.diagramsView = new DiagramsView(
+                    leaf, null, {
+                        path: this.activeLeafPath(this.workspace),
+                        basename: this.activeLeafName(this.workspace),
+                        svgPath: '',
+                        xmlPath: '',
+                        diagramExists: false,
+                    })
+            )
+        );
         this.registerView(DIAGRAM_EDIT_VIEW_TYPE, (leaf: WorkspaceLeaf) => {
-            return this.diagramsView = new DiagramsFileView(
+            return this.diagramsView = new DiagramsView(
                 leaf, null, {
                     path: this.activeLeafPath(this.workspace),
                     basename: this.activeLeafName(this.workspace),
@@ -93,10 +91,12 @@ export default class DiagramsNet extends Plugin {
         this.registerExtensions(["drawio"], DIAGRAM_EDIT_VIEW_TYPE);
     }
 
+
+
     isFileValidDiagram(file: TAbstractFile) {
         let itIs = false
         if (file instanceof TFile && file.extension === 'svg') {
-            const xmlFile = this.app.vault.getAbstractFileByPath(this.getXmlPath(file.path));
+            const xmlFile = this.app.vault.getAbstractFileByPath(getXmlPath(file.path));
             if (xmlFile && xmlFile instanceof TFile && xmlFile.extension === 'xml') {
                 itIs = true
             }
@@ -104,8 +104,13 @@ export default class DiagramsNet extends Plugin {
         return itIs
     }
 
-    getXmlPath(path: string) {
-        return (path + '.xml')
+    async availablePath() {
+        // @ts-ignore: Type not documented.
+        const base = await this.vault.getAvailablePathForAttachments('Diagram', 'svg')
+        return {
+            svgPath: base,
+            xmlPath: getXmlPath(base)
+        }
     }
 
     activeLeafPath(workspace: Workspace) {
@@ -116,14 +121,6 @@ export default class DiagramsNet extends Plugin {
         return workspace.activeLeaf?.getDisplayText();
     }
 
-    async availablePath() {
-        // @ts-ignore: Type not documented.
-        const base = await this.vault.getAvailablePathForAttachments('Diagram', 'svg')
-        return {
-            svgPath: base,
-            xmlPath: this.getXmlPath(base)
-        }
-    }
 
     async attemptNewDiagram() {
         const {svgPath, xmlPath} = await this.availablePath()
@@ -137,7 +134,7 @@ export default class DiagramsNet extends Plugin {
         this.initView(fileInfo);
     }
 
-    attemptEditDiagram(svgFile: TFile) {
+    async attemptEditDiagram(svgFile: TFile) {
         if (!this.isFileValidDiagram(svgFile)) {
             new Notice('Diagram is not valid. (Missing .xml data)');
         } else {
@@ -145,10 +142,10 @@ export default class DiagramsNet extends Plugin {
                 path: this.activeLeafPath(this.workspace),
                 basename: this.activeLeafName(this.workspace),
                 svgPath: svgFile.path,
-                xmlPath: this.getXmlPath(svgFile.path),
+                xmlPath: getXmlPath(svgFile.path),
                 diagramExists: true,
             };
-            this.initView(fileInfo);
+            return this.initView(fileInfo);
         }
 
     }
@@ -164,21 +161,21 @@ export default class DiagramsNet extends Plugin {
         // const leaf = this.app.workspace.getLeaf(true, 'horizontal')
 
         const diagramView = new DiagramsView(leaf, hostView, fileInfo)
-        leaf.open(diagramView)
+        return leaf.open(diagramView)
     }
 
     handleDeleteFile(file: TAbstractFile) {
         if (this.isFileValidDiagram(file)) {
-            const xmlFile = this.app.vault.getAbstractFileByPath(this.getXmlPath(file.path));
+            const xmlFile = this.app.vault.getAbstractFileByPath(getXmlPath(file.path));
             this.vault.delete(xmlFile)
         }
     }
 
     handleRenameFile(file: TAbstractFile, oldname: string) {
         if (file instanceof TFile && file.extension === 'svg') {
-            const xmlFile = this.app.vault.getAbstractFileByPath(this.getXmlPath(oldname));
+            const xmlFile = this.app.vault.getAbstractFileByPath(getXmlPath(oldname));
             if (xmlFile && xmlFile instanceof TFile && xmlFile.extension === 'xml') {
-                this.vault.rename(xmlFile, this.getXmlPath(file.path))
+                this.vault.rename(xmlFile, getXmlPath(file.path))
             }
         }
     }
@@ -197,7 +194,7 @@ export default class DiagramsNet extends Plugin {
                     .setTitle("Edit diagram")
                     .setIcon("diagram")
                     .onClick(async () => {
-                        this.attemptEditDiagram(file);
+                        await this.attemptEditDiagram(file);
                     });
             });
         }
