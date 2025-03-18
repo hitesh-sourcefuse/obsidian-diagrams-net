@@ -114,7 +114,7 @@ export default class DiagramsNet extends Plugin {
     }
 
     activeLeafPath(workspace: Workspace) {
-        return workspace.activeLeaf?.view.getState().file;
+        return workspace.getLeaf().view.getState().file as string;
     }
 
     activeLeafName(workspace: Workspace) {
@@ -202,8 +202,7 @@ export default class DiagramsNet extends Plugin {
             const svgBuffer = Buffer.from(blankDiagram.replace('data:image/svg+xml;base64,', ''), 'base64');
 
             const fileNameModal = new NewDiagramModel(this.app, (fileName: string) => {
-
-                const newFileName = (fileName || Date.now()) + ".drawio";
+                const newFileName = `${fileName}.drawio`;
                 this.vault.createBinary(path.join(file.path, newFileName), svgBuffer)
                     .then(() => {
                         new Notice(`Created "${fileNameModal}" successfully`);
@@ -229,7 +228,7 @@ export default class DiagramsNet extends Plugin {
                 .setTitle("Insert new diagram")
                 .setIcon("diagram")
                 .onClick(async () => {
-                    this.attemptNewDiagram();
+                    await this.attemptNewDiagram();
                 });
         });
     }
@@ -286,6 +285,7 @@ export class NewDiagramModel extends Modal {
 
     component() {
         return (props: any) => {
+            const defaultFileName = `diagram-${(new Date).toISOString().split('T')[0]}`
             const [data, setData] = React.useState("")
 
             return <>
@@ -293,7 +293,7 @@ export class NewDiagramModel extends Modal {
                     <input
                         className={"rename-textarea"}
                         name={"fileName"}
-                        defaultValue={Date.now()}
+                        defaultValue={defaultFileName}
                         onChange={(e) => {
                             setData(e.target.value)
                         }}

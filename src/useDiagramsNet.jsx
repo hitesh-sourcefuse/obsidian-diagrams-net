@@ -42,7 +42,10 @@ const buildURL = () => {
         '&browser=0' +
         '&picker=0' +
         '&plugins=1' +
-        '&p=sql'
+        '&p=sql' +
+        '&modified=1' +
+        '&keepmodified=1' +
+        '&saveAndExit=0&noSaveBtn=1&noExitBtn=1'
     const dark = '&dark=' + SettingStorage.getSetting('colorSchema');
 
     return domain + '?embed=1&proto=json&spin=1' + ui + libraries + dark
